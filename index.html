@@ -667,13 +667,7 @@
             }
 
             static async saveAccount(accountData) {
-                if (!currentUser) await this.initAuth();
-                if (!currentUser) {
-                    this.saveLocalAccount(accountData);
-                    return accountData.id || Date.now().toString();
-                }
-
-                const docId = accountData.id || db.collection('users').doc(currentUser.uid).collection('accounts').doc().id;
+                const docId = accountData.id || Date.now().toString();
                 const record = {
                     id: docId,
                     label: accountData.label || accountData.username || 'Xtream IPTV',
@@ -682,26 +676,36 @@
                     password: accountData.password,
                     corsProxy: accountData.corsProxy || 'auto',
                     isDefault: !!accountData.isDefault,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    updatedAt: new Date().toISOString()
                 };
 
-                if (accountData.isDefault) {
-                    await this.clearDefaults();
-                }
-
-                await db.collection('users').doc(currentUser.uid).collection('accounts').doc(docId).set(record, { merge: true });
+                // Always save locally immediately
                 this.saveLocalAccount(record);
+
+                // Attempt Firestore sync in background
+                try {
+                    if (currentUser && db) {
+                        if (accountData.isDefault) {
+                            await this.clearDefaults();
+                        }
+                        await db.collection('users').doc(currentUser.uid).collection('accounts').doc(docId).set(record, { merge: true });
+                    }
+                } catch (err) {
+                    console.warn("Firestore save sync warning:", err);
+                }
                 return docId;
             }
 
             static async clearDefaults() {
-                if (!currentUser) return;
-                const snap = await db.collection('users').doc(currentUser.uid).collection('accounts').where('isDefault', '==', true).get();
-                const batch = db.batch();
-                snap.forEach(doc => {
-                    batch.update(doc.ref, { isDefault: false });
-                });
-                await batch.commit();
+                if (!currentUser || !db) return;
+                try {
+                    const snap = await db.collection('users').doc(currentUser.uid).collection('accounts').where('isDefault', '==', true).get();
+                    const batch = db.batch();
+                    snap.forEach(doc => {
+                        batch.update(doc.ref, { isDefault: false });
+                    });
+                    await batch.commit();
+                } catch (e) {}
             }
 
             static async setDefaultAccount(accountId) {
