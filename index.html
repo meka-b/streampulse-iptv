@@ -825,29 +825,33 @@
             static async fetchWithProxy(targetUrl) {
                 const proxyPipelines = [];
 
+                // Priority 1: Vercel Serverless Proxy API (Works on Vercel deployments, bypasses CORS & Mixed Content)
+                if (window.location.hostname.includes('vercel.app') || window.location.hostname !== 'localhost') {
+                    proxyPipelines.push(`/api/proxy?url=${encodeURIComponent(targetUrl)}`);
+                }
+
                 if (AppState.corsProxy === 'direct') {
                     proxyPipelines.push(targetUrl);
+                } else if (AppState.corsProxy === 'vercel') {
+                    proxyPipelines.unshift(`/api/proxy?url=${encodeURIComponent(targetUrl)}`);
                 } else if (AppState.corsProxy === 'codetabs') {
                     proxyPipelines.push(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`);
                 } else if (AppState.corsProxy === 'corsproxy') {
                     proxyPipelines.push(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
                 } else if (AppState.corsProxy === 'allorigins') {
                     proxyPipelines.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
-                } else if (AppState.corsProxy === 'thingproxy') {
-                    proxyPipelines.push(`https://thingproxy.freeboard.io/fetch/${targetUrl}`);
                 } else {
-                    // Otomatik Mod: Sırasıyla tüm güvenilir proxy servislerini dener
+                    // Auto Mode: Tries Vercel API, CodeTabs, CorsProxy, AllOrigins, Direct
                     proxyPipelines.push(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`);
                     proxyPipelines.push(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
                     proxyPipelines.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
-                    proxyPipelines.push(`https://thingproxy.freeboard.io/fetch/${targetUrl}`);
                     proxyPipelines.push(targetUrl);
                 }
 
                 for (const url of proxyPipelines) {
                     try {
                         const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 9000);
+                        const timeoutId = setTimeout(() => controller.abort(), 12000);
 
                         const response = await fetch(url, { signal: controller.signal });
                         clearTimeout(timeoutId);
@@ -863,7 +867,7 @@
                     }
                 }
 
-                throw new Error("IPTV Sunucusundan yanıt alınamadı. CORS Çözücü modunu değiştirmeyi veya M3U yüklemeyi deneyin.");
+                throw new Error("IPTV Sunucusuna bağlanılamadı. M3U yüklemeyi veya doğrudan M3U dosyasını denemeyi öneririz.");
             }
 
             static async authenticate(host, username, password) {
