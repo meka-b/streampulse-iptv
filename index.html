@@ -1052,7 +1052,12 @@
                     this.hls.attachMedia(this.video);
 
                     this.hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-                        this.video.play().catch(e => console.warn("Autoplay:", e));
+                        const playPromise = this.video.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(e => {
+                                console.log("Autoplay wait or user interaction needed:", e);
+                            });
+                        }
                         document.getElementById('player-spinner').classList.add('hidden');
 
                         // Qualities
