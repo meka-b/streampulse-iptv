@@ -956,17 +956,20 @@
                     const demoItem = DemoMockData.liveStreams.find(s => s.stream_id === streamId);
                     return demoItem ? demoItem.url : '';
                 }
+
+                let rawUrl = '';
                 if (AppState.currentView === 'm3u') {
                     const m3uItem = AppState.m3uStreams.find(s => String(s.stream_id) === String(streamId));
-                    return m3uItem ? m3uItem.url : '';
+                    rawUrl = m3uItem ? m3uItem.url : '';
+                } else {
+                    const { host, username, password } = AppState.credentials;
+                    const cleanHost = this.normalizeHost(host);
+                    const prefix = AppState.currentView === 'vod' ? 'movie' : AppState.currentView === 'series' ? 'series' : 'live';
+                    const extension = containerExt || (AppState.currentView === 'vod' ? 'mp4' : 'm3u8');
+                    rawUrl = `${cleanHost}/${prefix}/${encodeURIComponent(username)}/${encodeURIComponent(password)}/${streamId}.${extension}`;
                 }
 
-                const { host, username, password } = AppState.credentials;
-                const cleanHost = this.normalizeHost(host);
-                const prefix = AppState.currentView === 'vod' ? 'movie' : AppState.currentView === 'series' ? 'series' : 'live';
-                const extension = containerExt || (AppState.currentView === 'vod' ? 'mp4' : 'm3u8');
-                
-                const rawUrl = `${cleanHost}/${prefix}/${encodeURIComponent(username)}/${encodeURIComponent(password)}/${streamId}.${extension}`;
+                if (!rawUrl) return '';
                 
                 if (AppState.corsProxy === 'corsproxy') {
                     return `https://corsproxy.io/?${encodeURIComponent(rawUrl)}`;
@@ -975,7 +978,7 @@
                 }
 
                 // On HTTPS (Vercel deployments), wrap stream URLs with Vercel Serverless Proxy to fix Mixed Content
-                if (window.location.protocol === 'https:' || AppState.corsProxy === 'auto') {
+                if (window.location.protocol === 'https:' || AppState.corsProxy === 'auto' || rawUrl.startsWith('http:')) {
                     return `/api/proxy?url=${encodeURIComponent(rawUrl)}`;
                 }
                 return rawUrl;
