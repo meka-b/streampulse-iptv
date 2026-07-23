@@ -30,28 +30,51 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid URL' });
   }
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+  // Common IPTV player User-Agents to bypass anti-leech 401 blocks
+  const userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'VLC/3.0.18 LibVLC/3.0.18',
+    'IPTVSmartersPlayer/3.1.5 (Linux;Android 11)',
+    'Lavf/58.29.100'
+  ];
 
-    // Send valid IPTV player User-Agent & Headers to bypass 401 Unauthorized anti-leech blocks
-    const response = await fetch(targetUrl, {
-      method: req.method || 'GET',
-      headers: {
-        'User-Agent': 'IPTVSmartersPlayer/3.1.5 (Linux;Android 11)',
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Connection': 'keep-alive',
-        'Referer': parsedUrl.origin
-      },
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
+  let response = null;
+  let lastStatus = 500;
+  let lastStatusText = 'Failed';
 
-    if (!response.ok) {
-      return res.status(response.status).send(`Target HTTP Error: ${response.statusText}`);
+  for (const ua of userAgents) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+      const resAttempt = await fetch(targetUrl, {
+        method: req.method || 'GET',
+        headers: {
+          'User-Agent': ua,
+          'Accept': '*/*',
+          'Accept-Language': 'en-US,en;q=0.9'
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (resAttempt.ok) {
+        response = resAttempt;
+        break;
+      } else {
+        lastStatus = resAttempt.status;
+        lastStatusText = resAttempt.statusText;
+      }
+    } catch (err) {
+      console.warn(`Attempt with UA "${ua}" failed:`, err);
     }
+  }
 
+  if (!response || !response.ok) {
+    return res.status(lastStatus).send(`Target HTTP Error: ${lastStatusText}`);
+  }
+
+  try {
     const contentType = response.headers.get('content-type') || '';
 
     // If binary stream (.ts video segment) or octet-stream
