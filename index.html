@@ -7,8 +7,7 @@
 
     <!-- PWA Manifest & Meta Tags -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#4f46e5">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
     <!-- Firebase SDK v10 (Compat Version) -->
@@ -825,15 +824,11 @@
             static async fetchWithProxy(targetUrl) {
                 const proxyPipelines = [];
 
-                // Priority 1: Vercel Serverless Proxy API (Works on Vercel deployments, bypasses CORS & Mixed Content)
-                if (window.location.hostname.includes('vercel.app') || window.location.hostname !== 'localhost') {
-                    proxyPipelines.push(`/api/proxy?url=${encodeURIComponent(targetUrl)}`);
-                }
+                // 1. Öncelik: Vercel Sunucusundaki Özel Proxy Endpoint'i (/api/proxy?url=)
+                proxyPipelines.push(`/api/proxy?url=${encodeURIComponent(targetUrl)}`);
 
                 if (AppState.corsProxy === 'direct') {
                     proxyPipelines.push(targetUrl);
-                } else if (AppState.corsProxy === 'vercel') {
-                    proxyPipelines.unshift(`/api/proxy?url=${encodeURIComponent(targetUrl)}`);
                 } else if (AppState.corsProxy === 'codetabs') {
                     proxyPipelines.push(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`);
                 } else if (AppState.corsProxy === 'corsproxy') {
@@ -841,10 +836,8 @@
                 } else if (AppState.corsProxy === 'allorigins') {
                     proxyPipelines.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
                 } else {
-                    // Auto Mode: Tries Vercel API, CodeTabs, CorsProxy, AllOrigins, Direct
                     proxyPipelines.push(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`);
                     proxyPipelines.push(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
-                    proxyPipelines.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
                     proxyPipelines.push(targetUrl);
                 }
 
