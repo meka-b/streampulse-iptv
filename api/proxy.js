@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   const targetUrl = req.query.url;
 
-  // Enable CORS
+  // Enable CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 14000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     const response = await fetch(targetUrl, {
       method: req.method || 'GET',
@@ -32,13 +32,68 @@ export default async function handler(req, res) {
     });
     clearTimeout(timeoutId);
 
-    const contentType = response.headers.get('content-type');
-    if (contentType) {
-      res.setHeader('Content-Type', contentType);
+    if (!response.ok) {
+      return res.status(response.status).send(`Target HTTP Error: ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+
+    // If binary stream (.ts video segment) or octet-stream
+    if (targetUrl.includes('.ts') || contentType.includes('video/') || contentType.includes('octet-stream')) {
+      res.setHeader('Content-Type', contentType || 'video/mp2t');
+      const arrayBuffer = await response.arrayBuffer();
+      return res.status(200).send(Buffer.from(arrayBuffer));
     }
 
     const text = await response.text();
-    return res.status(response.status).send(text);
+
+    // If M3U8 playlist content, rewrite relative segment paths through /api/proxy
+    if (targetUrl.includes('.m3u8') || text.includes('#EXTM3U')) {
+      res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+
+      try {
+        const parsedUrl = new URL(targetUrl);
+        const origin = parsedUrl.origin;
+        const basePath = parsedUrl.pathname.substring(0, parsedUrl.pathname.lastIndexOf('/') + 1);
+        const baseDir = `${origin}${basePath}`;
+
+        const lines = text.split('\n');
+        const rewrittenLines = lines.map(line => {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) {
+            if (trimmed.includes('URI="')) {
+              return trimmed.replace(/URI="([^"]+)"/g, (match, uri) => {
+                let fullUri = uri;
+                if (uri.startsWith('/')) fullUri = `${origin}${uri}`;
+                else if (!uri.startsWith('http')) fullUri = `${baseDir}${uri}`;
+                return `URI="/api/proxy?url=${encodeURIComponent(fullUri)}"`;
+              });
+            }
+            return line;
+          }
+
+          let fullSegmentUrl = trimmed;
+          if (trimmed.startsWith('/')) {
+            fullSegmentUrl = `${origin}${trimmed}`;
+          } else if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+            fullSegmentUrl = `${baseDir}${trimmed}`;
+          }
+
+          return `/api/proxy?url=${encodeURIComponent(fullSegmentUrl)}`;
+        });
+
+        return res.status(200).send(rewrittenLines.join('\n'));
+      } catch (e) {
+        return res.status(200).send(text);
+      }
+    }
+
+    // Default API JSON / Text response
+    if (contentType) {
+      res.setHeader('Content-Type', contentType);
+    }
+    return res.status(200).send(text);
+
   } catch (error) {
     console.error('Vercel serverless proxy error:', error);
     return res.status(500).json({ error: 'Proxy fetch failed', details: error.message });
