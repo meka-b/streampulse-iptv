@@ -618,7 +618,6 @@
                                 this.updateAuthUI(cred.user);
                                 resolve(cred.user);
                             } catch (err) {
-                                console.warn("Firebase Auth Error:", err);
                                 resolve(null);
                             }
                         } else {
@@ -968,6 +967,11 @@
                     return `https://corsproxy.io/?${encodeURIComponent(rawUrl)}`;
                 } else if (AppState.corsProxy === 'codetabs') {
                     return `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rawUrl)}`;
+                }
+
+                // On HTTPS (Vercel deployments), wrap stream URLs with Vercel Serverless Proxy to fix Mixed Content
+                if (window.location.protocol === 'https:' || AppState.corsProxy === 'auto') {
+                    return `/api/proxy?url=${encodeURIComponent(rawUrl)}`;
                 }
                 return rawUrl;
             }
