@@ -5,8 +5,7 @@
   "main": "index.html",
   "scripts": {
     "dev": "npx -y serve .",
-    "start": "npx -y serve .",
-    "build": "echo 'Static build ready for Vercel'"
+    "start": "npx -y serve ."
   },
   "keywords": [
     "iptv",
