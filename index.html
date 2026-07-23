@@ -541,6 +541,11 @@
                         <i class="fa-solid fa-play"></i>
                         <span>Oynatma Listesini Yükle</span>
                     </button>
+
+                    <button type="button" id="load-builtin-m3u-btn" class="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 text-xs font-semibold border border-indigo-500/30 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-list-check"></i>
+                        <span>Dahili Listeyi Yükle (playlist-20260723-112336.m3u)</span>
+                    </button>
                 </form>
 
                 <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
@@ -1789,6 +1794,11 @@
                 renderCategories();
             });
 
+            document.getElementById('load-builtin-m3u-btn').addEventListener('click', async () => {
+                document.getElementById('login-modal').classList.add('hidden');
+                await loadDefaultM3UPlaylist();
+            });
+
             // Demo Mode Launcher
             const launchDemoMode = () => {
                 AppState.isDemoMode = true;
@@ -1884,6 +1894,38 @@
             });
         }
 
+        async function loadDefaultM3UPlaylist() {
+            showToast("Varsayılan M3U Oynatma Listesi Yükleniyor...", "info");
+            try {
+                const res = await fetch('./playlist-20260723-112336.m3u');
+                if (!res.ok) throw new Error("Oynatma listesi dosyası bulunamadı");
+                
+                const m3uText = await res.text();
+                const parsed = parseM3UContent(m3uText);
+
+                if (parsed.length === 0) {
+                    showToast("Oynatma listesinde kanal bulunamadı", "error");
+                    return false;
+                }
+
+                AppState.m3uStreams = parsed;
+                AppState.currentView = 'm3u';
+                AppState.isDemoMode = false;
+                AppState.cache = { categories: {}, streams: {}, seriesInfo: {} };
+
+                document.getElementById('connect-btn-label').textContent = "Özel M3U Listesi";
+                document.getElementById('account-status-text').textContent = `${parsed.length} Kanal`;
+                document.getElementById('account-status-dot').className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+
+                showToast(`${parsed.length} yayın listelendi!`, "success");
+                renderCategories();
+                return true;
+            } catch (err) {
+                console.warn("Default M3U load error:", err);
+                return false;
+            }
+        }
+
         // Initial Auto-Load Logic on Application Launch
         window.onload = async function() {
             const videoElem = document.getElementById('main-player');
@@ -1902,12 +1944,18 @@
                     showToast(`Varsayılan hesaba otomatik bağlanılıyor: ${defaultAcc.label || defaultAcc.username}`, "info");
                     await connectToXtreamAccount(defaultAcc);
                 } else {
+                    const loadedM3u = await loadDefaultM3UPlaylist();
+                    if (!loadedM3u) {
+                        AppState.isDemoMode = true;
+                        renderCategories();
+                    }
+                }
+            } catch (err) {
+                const loadedM3u = await loadDefaultM3UPlaylist();
+                if (!loadedM3u) {
                     AppState.isDemoMode = true;
                     renderCategories();
                 }
-            } catch (err) {
-                AppState.isDemoMode = true;
-                renderCategories();
             }
         };
     </script>
