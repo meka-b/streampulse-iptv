@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
-  const targetUrl = req.query.url;
+  let targetUrl = req.query.url;
 
-  // Enable CORS headers
+  // Enable CORS headers for browser player
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -18,15 +18,31 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing target URL parameter' });
   }
 
+  // Safely decode target URL
+  try {
+    targetUrl = decodeURIComponent(targetUrl);
+  } catch (e) {}
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(targetUrl);
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
+    // Send valid IPTV player User-Agent & Headers to bypass 401 Unauthorized anti-leech blocks
     const response = await fetch(targetUrl, {
       method: req.method || 'GET',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': '*/*'
+        'User-Agent': 'IPTVSmartersPlayer/3.1.5 (Linux;Android 11)',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Connection': 'keep-alive',
+        'Referer': parsedUrl.origin
       },
       signal: controller.signal
     });
@@ -52,7 +68,6 @@ export default async function handler(req, res) {
       res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
 
       try {
-        const parsedUrl = new URL(targetUrl);
         const origin = parsedUrl.origin;
         const basePath = parsedUrl.pathname.substring(0, parsedUrl.pathname.lastIndexOf('/') + 1);
         const baseDir = `${origin}${basePath}`;
