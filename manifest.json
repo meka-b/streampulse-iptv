@@ -1,0 +1,22 @@
+{
+  "short_name": "StreamPulse",
+  "name": "StreamPulse - Xtream & HLS IPTV Engine",
+  "description": "Real Xtream Codes & HLS IPTV Player with Firebase & EPG Support",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/718/718065.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/718/718065.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#0b0f19",
+  "theme_color": "#4f46e5",
+  "display": "standalone",
+  "orientation": "any"
+}

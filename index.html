@@ -1,0 +1,1905 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamPulse - Real Xtream Codes & HLS IPTV Engine</title>
+
+    <!-- PWA Manifest & Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Firebase SDK v10 (Compat Version) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics-compat.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#1e1b4b',
+                            accent: '#f43f5e'
+                        },
+                        darkbg: {
+                            900: '#0f172a',
+                            800: '#1e293b',
+                            700: '#334155',
+                            600: '#475569'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- HLS.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+            user-select: none;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4f46e5;
+        }
+        .player-controls {
+            background: linear-gradient(0deg, rgba(15,23,42,0.95) 0%, rgba(15,23,42,0.7) 60%, rgba(0,0,0,0) 100%);
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-modal {
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(16px);
+        }
+        .content-visibility-auto {
+            content-visibility: auto;
+            contain-intrinsic-size: 1px 56px;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col bg-slate-950 text-slate-100">
+
+    <div id="app" class="flex flex-col h-full w-full relative">
+        
+        <!-- Toast Notification Container -->
+        <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+        <header class="h-16 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex items-center justify-between px-4 z-20 shrink-0">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 cursor-pointer" id="brand-home-btn">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-rose-500 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-indigo-500/20">
+                        <i class="fa-solid font-bold fa-play text-sm"></i>
+                    </div>
+                    <span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">StreamPulse</span>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Xtream + Firebase</span>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <nav id="view-tabs" class="hidden md:flex items-center gap-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800 ml-4">
+                    <button data-view="live" class="nav-tab active flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-white bg-indigo-600">
+                        <i class="fa-solid fa-tv"></i> Live TV
+                    </button>
+                    <button data-view="vod" class="nav-tab flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800">
+                        <i class="fa-solid fa-film"></i> Movies
+                    </button>
+                    <button data-view="series" class="nav-tab flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800">
+                        <i class="fa-solid fa-clapperboard"></i> Series
+                    </button>
+                    <button data-view="m3u" class="nav-tab flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800">
+                        <i class="fa-solid fa-file-code"></i> M3U Playlist
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Global Search, Saved Accounts, PWA & Auth Info -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <div class="relative hidden sm:block w-36 lg:w-56">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="global-search" placeholder="Kanallarda ara..." 
+                           class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                </div>
+
+                <!-- PWA Install Button -->
+                <button id="pwa-install-btn" class="hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 transition text-xs font-bold text-white shadow">
+                    <i class="fa-solid fa-download"></i>
+                    <span class="hidden md:inline">Uygulamayı Yükle</span>
+                </button>
+
+                <!-- Saved Accounts Switcher Button -->
+                <button id="open-saved-accounts-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition text-xs font-medium text-slate-200">
+                    <i class="fa-solid fa-folder-open text-indigo-400"></i>
+                    <span class="hidden lg:inline">Hesaplarım</span>
+                    <span id="saved-accounts-count-badge" class="bg-indigo-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">0</span>
+                </button>
+
+                <!-- Auth / User Profile Button -->
+                <button id="auth-profile-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition text-xs font-medium text-slate-200">
+                    <i class="fa-solid fa-user text-indigo-400"></i>
+                    <span id="auth-user-name" class="hidden sm:inline">Giriş Yap</span>
+                </button>
+
+                <!-- Connection / Settings Button -->
+                <button id="open-login-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition text-xs font-medium text-white shadow-md shadow-indigo-600/20">
+                    <i class="fa-solid fa-plus"></i>
+                    <span class="hidden sm:inline" id="connect-btn-label">Yeni Sunucu</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="flex-1 flex overflow-hidden relative">
+
+            <!-- Category / Navigation Left Sidebar -->
+            <aside id="sidebar" class="w-64 bg-slate-900/90 border-r border-slate-800/80 flex flex-col shrink-0 transition-all duration-300 z-10">
+                <div class="p-3 border-b border-slate-800/60 flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Kategoriler</span>
+                    <span id="category-count" class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">0</span>
+                </div>
+
+                <div class="p-2 border-b border-slate-800/60">
+                    <div class="relative">
+                        <i class="fa-solid fa-filter absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                        <input type="text" id="category-search" placeholder="Kategori filtrele..." 
+                               class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <!-- Category List -->
+                <div id="category-list" class="flex-1 overflow-y-auto p-2 space-y-1">
+                    <!-- Dynamic categories inserted here -->
+                </div>
+            </aside>
+
+            <!-- Channels & Streams Column -->
+            <section id="content-list-section" class="w-72 lg:w-80 bg-slate-950/80 border-r border-slate-800/80 flex flex-col shrink-0">
+                <div class="p-3 border-b border-slate-800/80 flex items-center justify-between">
+                    <h2 id="current-category-title" class="text-xs font-bold text-slate-200 truncate pr-2">Tüm Kanallar</h2>
+                    <span id="stream-count" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-mono">0 öğe</span>
+                </div>
+
+                <!-- Items List Container (With Infinite Batch Scroll Performance) -->
+                <div id="items-container" class="flex-1 overflow-y-auto divide-y divide-slate-800/40 p-1">
+                    <!-- Dynamic Stream Items Rendered Here -->
+                </div>
+            </section>
+
+            <!-- Video Player Section -->
+            <section id="player-section" class="flex-1 bg-black flex flex-col relative overflow-hidden">
+                
+                <!-- Main Screen Container (Video + Controls) -->
+                <div class="relative flex-1 bg-black flex items-center justify-center overflow-hidden group">
+                    
+                    <!-- HTML5 Video Canvas -->
+                    <video id="main-player" class="w-full h-full object-contain" playsinline crossorigin="anonymous"></video>
+
+                    <!-- Player Placeholder Overlay -->
+                    <div id="player-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 text-center p-6 z-10">
+                        <div class="w-20 h-20 rounded-full bg-indigo-600/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mb-4 shadow-xl">
+                            <i class="fa-solid fa-tv text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-100 mb-1">StreamPulse Xtream & HLS Player</h3>
+                        <p class="text-slate-400 text-xs max-w-md mb-6">Xtream Codes sunucu bilgilerinizi ekleyin, kaydedin ve varsayılan hesabınız ile otomatik açılışın keyfini çıkarın.</p>
+                        
+                        <div class="flex flex-wrap items-center justify-center gap-3">
+                            <button id="placeholder-connect-btn" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white shadow-lg transition">
+                                <i class="fa-solid fa-plug mr-2"></i> Xtream API Bağlan
+                            </button>
+                            <button id="placeholder-saved-btn" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 transition">
+                                <i class="fa-solid fa-folder-open text-indigo-400 mr-2"></i> Kayıtlı Hesaplarım
+                            </button>
+                            <button id="placeholder-demo-btn" class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs font-bold text-slate-300 border border-slate-800 transition">
+                                <i class="fa-solid fa-bolt text-amber-400 mr-2"></i> Demo Modu
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Stream Loading Spinner -->
+                    <div id="player-spinner" class="hidden absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center z-20">
+                        <div class="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                        <p id="spinner-text" class="text-xs text-slate-300 font-medium tracking-wide">Yayın Yükleniyor...</p>
+                    </div>
+
+                    <!-- Player Controls Bar -->
+                    <div id="player-controls-bar" class="player-controls absolute bottom-0 left-0 right-0 p-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30">
+                        <div id="progress-container" class="hidden flex items-center gap-2 w-full">
+                            <span id="current-time" class="text-[10px] font-mono text-slate-300">00:00</span>
+                            <input type="range" id="seek-bar" min="0" max="100" value="0" class="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                            <span id="duration-time" class="text-[10px] font-mono text-slate-400">00:00</span>
+                        </div>
+
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <div class="flex items-center gap-3">
+                                <button id="play-pause-btn" class="text-white hover:text-indigo-400 transition text-lg w-8 h-8 flex items-center justify-center">
+                                    <i class="fa-solid fa-play"></i>
+                                </button>
+
+                                <div class="flex items-center gap-2">
+                                    <button id="mute-btn" class="text-slate-300 hover:text-white transition text-sm">
+                                        <i class="fa-solid fa-volume-high"></i>
+                                    </button>
+                                    <input type="range" id="volume-bar" min="0" max="1" step="0.05" value="1" class="w-16 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                                </div>
+
+                                <div class="h-4 w-px bg-slate-700 mx-1"></div>
+
+                                <div class="flex flex-col">
+                                    <span id="player-channel-title" class="text-xs font-bold text-white truncate max-w-[150px] sm:max-w-[250px]">Yayın Seçilmedi</span>
+                                    <span id="player-program-now" class="text-[10px] text-indigo-400 truncate max-w-[150px] sm:max-w-[250px]">Başlamak için bir kanal seçin</span>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <!-- Quality Selector -->
+                                <select id="quality-selector" class="bg-slate-900 border border-slate-700 text-indigo-400 text-[10px] font-bold rounded px-2 py-1 focus:outline-none cursor-pointer">
+                                    <option value="-1">Kalite: Otomatik</option>
+                                </select>
+
+                                <!-- Audio Track Selector -->
+                                <select id="audio-track-selector" class="bg-slate-900 border border-slate-700 text-slate-300 text-[10px] font-bold rounded px-2 py-1 focus:outline-none cursor-pointer">
+                                    <option value="-1">Ses: Varsayılan</option>
+                                </select>
+
+                                <!-- Subtitle Track Selector -->
+                                <select id="subtitle-track-selector" class="bg-slate-900 border border-slate-700 text-slate-300 text-[10px] font-bold rounded px-2 py-1 focus:outline-none cursor-pointer">
+                                    <option value="-1">Altyazı: Kapalı</option>
+                                </select>
+
+                                <button id="fullscreen-btn" title="Tam Ekran" class="text-slate-400 hover:text-white transition text-sm ml-1">
+                                    <i class="fa-solid fa-maximize"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Channel & EPG Information Deck -->
+                <div id="epg-deck" class="h-48 bg-slate-900 border-t border-slate-800 flex flex-col p-3 overflow-hidden shrink-0">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-3">
+                            <img id="epg-channel-logo" src="https://placehold.co/80x80/1e293b/6366f1?text=TV" class="w-9 h-9 rounded bg-slate-800 object-contain p-0.5 border border-slate-700" alt="Logo">
+                            <div>
+                                <h3 id="epg-channel-name" class="text-sm font-bold text-slate-100">Elektronik Program Rehberi (EPG)</h3>
+                                <div class="flex items-center gap-2">
+                                    <p id="epg-current-title" class="text-xs text-indigo-400 font-medium truncate max-w-md">Yayın detaylarını görmek için kanal seçin</p>
+                                    <span id="epg-time-range" class="text-[10px] text-slate-400 font-mono"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button id="favorite-toggle-btn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 transition flex items-center gap-1.5">
+                                <i class="fa-regular fa-star text-amber-400"></i> Favorilere Ekle
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- EPG Progress Bar Container -->
+                    <div id="epg-progress-wrapper" class="hidden mb-2">
+                        <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono mb-1">
+                            <span id="epg-start-time">00:00</span>
+                            <span id="epg-progress-percent" class="font-bold text-indigo-400">0%</span>
+                            <span id="epg-end-time">00:00</span>
+                        </div>
+                        <div class="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                            <div id="epg-progress-bar" class="h-full bg-gradient-to-r from-indigo-600 to-rose-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Upcoming Schedule Container -->
+                    <div id="epg-description-box" class="flex-1 bg-slate-950/70 rounded-xl p-2.5 border border-slate-800/80 overflow-y-auto">
+                        <p id="epg-description" class="text-xs text-slate-400 leading-relaxed">
+                            Xtream Codes sunucu bilgilerinizi ekleyin veya kayıtlı hesaplarınız arasından seçim yapın.
+                        </p>
+                        <div id="epg-upcoming-list" class="hidden mt-2 space-y-1.5 divide-y divide-slate-800/50 pt-2 border-t border-slate-800/60"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Firebase Auth Modal (Giriş / Kayıt Ol) -->
+        <div id="auth-modal" class="hidden fixed inset-0 z-50 glass-modal flex items-center justify-center p-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6 relative">
+                <button id="close-auth-btn" class="absolute top-4 right-4 text-slate-400 hover:text-white text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-100" id="auth-modal-title">Hesap Girişi</h3>
+                        <p class="text-xs text-slate-400">Firebase ile hesaplarınızı güvenle eşitleyin</p>
+                    </div>
+                </div>
+
+                <!-- Logged In Profile View -->
+                <div id="auth-logged-in-view" class="hidden space-y-4">
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-400">Giriş Yapılan Hesap:</span>
+                            <span id="logged-in-email" class="font-bold text-indigo-400">email@example.com</span>
+                        </div>
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-400">Kullanıcı Kimliği (UID):</span>
+                            <span id="logged-in-uid" class="font-mono text-[10px] text-slate-500 truncate max-w-[180px]">...</span>
+                        </div>
+                    </div>
+
+                    <button id="signout-btn" class="w-full py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 text-xs font-bold border border-rose-500/20 transition">
+                        Çıkış Yap
+                    </button>
+                </div>
+
+                <!-- Login / Register Form View -->
+                <div id="auth-form-view" class="space-y-4">
+                    <!-- Auth Mode Tab Switcher -->
+                    <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+                        <button id="tab-auth-login" class="flex-1 py-1.5 rounded-lg text-white bg-indigo-600 transition">
+                            Giriş Yap
+                        </button>
+                        <button id="tab-auth-register" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+                            Kayıt Ol
+                        </button>
+                    </div>
+
+                    <form id="auth-form" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">E-posta Adresi</label>
+                            <input type="email" id="auth-email" required placeholder="ornek@email.com" 
+                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Şifre</label>
+                            <input type="password" id="auth-password" required placeholder="••••••••" 
+                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+                        </div>
+
+                        <button type="submit" id="auth-submit-btn" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/30">
+                            Giriş Yap
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Series / VOD Seasons & Episodes Modal -->
+        <div id="series-modal" class="hidden fixed inset-0 z-50 glass-modal flex items-center justify-center p-4 overflow-y-auto">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl shadow-2xl p-6 relative my-8 max-h-[85vh] flex flex-col">
+                <button id="close-series-btn" class="absolute top-4 right-4 text-slate-400 hover:text-white text-sm z-10">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+
+                <!-- Series Info Header Deck -->
+                <div class="flex flex-col sm:flex-row gap-4 mb-4 border-b border-slate-800 pb-4 shrink-0">
+                    <img id="series-poster" src="https://placehold.co/200x300/1e293b/6366f1?text=Series" class="w-28 h-40 rounded-xl bg-slate-950 object-cover border border-slate-800 shrink-0 shadow-lg" alt="Poster">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <h3 id="series-title" class="text-lg font-bold text-slate-100 truncate">Dizi Adı</h3>
+                            <span id="series-rating" class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30"><i class="fa-solid fa-star mr-1"></i>0.0</span>
+                        </div>
+                        <p id="series-genre" class="text-xs text-indigo-400 font-semibold mb-2">Tür: Drama, Aksiyon</p>
+                        <p id="series-plot" class="text-xs text-slate-400 leading-relaxed line-clamp-3 mb-2">Dizi özeti bekleniyor...</p>
+                        <p id="series-cast" class="text-[10px] text-slate-500 truncate">Oyuncular: -</p>
+                    </div>
+                </div>
+
+                <!-- Season Tabs -->
+                <div id="season-tabs-container" class="flex gap-2 overflow-x-auto pb-2 border-b border-slate-800/80 mb-3 shrink-0">
+                    <!-- Dynamic Season Buttons -->
+                </div>
+
+                <!-- Episodes List Grid -->
+                <div id="episodes-container" class="flex-1 overflow-y-auto space-y-2 pr-1">
+                    <!-- Dynamic Episode Cards -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Xtream Connection & Add Account Modal -->
+        <div id="login-modal" class="hidden fixed inset-0 z-50 glass-modal flex items-center justify-center p-4 overflow-y-auto">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6 relative my-8">
+                <button id="close-login-btn" class="absolute top-4 right-4 text-slate-400 hover:text-white text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-server"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-100">IPTV Sunucu Bağlantısı</h3>
+                        <p class="text-xs text-slate-400">Xtream API veya M3U Playlist Dosyası</p>
+                    </div>
+                </div>
+
+                <!-- Connection Method Switcher -->
+                <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800 mb-4 text-xs font-semibold">
+                    <button id="tab-btn-xtream" class="flex-1 py-1.5 rounded-lg text-white bg-indigo-600 transition">
+                        Xtream API
+                    </button>
+                    <button id="tab-btn-m3u" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+                        M3U Playlist / Yükle
+                    </button>
+                </div>
+
+                <!-- Xtream API Form -->
+                <form id="xtream-form" class="space-y-3.5">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Hesap Etiketi / Tanımı (İsteğe Bağlı)</label>
+                        <input type="text" id="xtream-label" placeholder="Örn: Ev IPTV Hesabım" 
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Sunucu Host URL (DNS / IP)</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-globe absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                            <input type="text" id="xtream-host" required placeholder="http://iptv-sunucu.com:8080" 
+                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Kullanıcı Adı</label>
+                            <input type="text" id="xtream-user" required placeholder="Kullanıcı Adı" 
+                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Şifre</label>
+                            <input type="password" id="xtream-pass" required placeholder="••••••••" 
+                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+
+                    <!-- CORS Proxy Resolver Selection -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">
+                            CORS Çözücü Modu
+                        </label>
+                        <select id="cors-proxy-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <option value="auto" selected>✨ Otomatik Düzeltme (Tüm Proxyleri Dener)</option>
+                            <option value="codetabs">CodeTabs Proxy</option>
+                            <option value="corsproxy">corsproxy.io</option>
+                            <option value="allorigins">AllOrigins Proxy</option>
+                            <option value="thingproxy">ThingProxy</option>
+                            <option value="direct">Doğrudan Bağlantı (Proxy Yok)</option>
+                        </select>
+                    </div>
+
+                    <!-- Save & Default Options -->
+                    <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800 space-y-2">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="xtream-save-account" checked class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-xs text-slate-300 font-medium">Bu hesabı hesabıma kaydet</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="xtream-is-default" class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-xs text-amber-400 font-semibold"><i class="fa-solid fa-star text-[10px] mr-1"></i> Varsayılan Yap (Açılışta otomatik bağlanır)</span>
+                        </label>
+                    </div>
+
+                    <div class="pt-2 flex flex-col gap-2">
+                        <button type="submit" id="connect-submit-btn" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2">
+                            <span>Sunucuya Bağlan ve Kaydet</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- M3U Playlist Upload / URL Form -->
+                <form id="m3u-form" class="hidden space-y-3.5">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">.m3u / .m3u8 Dosyası Yükle</label>
+                        <input type="file" id="m3u-file-input" accept=".m3u,.m3u8,.txt" 
+                               class="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 border border-slate-800 rounded-xl bg-slate-950 p-1 cursor-pointer">
+                    </div>
+
+                    <div class="relative flex py-1 items-center">
+                        <div class="flex-grow border-t border-slate-800"></div>
+                        <span class="flex-shrink mx-2 text-[10px] text-slate-500 uppercase font-bold">VEYA M3U Linki / İçeriği Yapıştırın</span>
+                        <div class="flex-grow border-t border-slate-800"></div>
+                    </div>
+
+                    <div>
+                        <textarea id="m3u-text-input" rows="3" placeholder="https://provider.com/get.php?username=x&password=y&type=m3u_plus VEYA #EXTM3U yapıştırın..." 
+                                  class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 font-mono"></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-lg flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play"></i>
+                        <span>Oynatma Listesini Yükle</span>
+                    </button>
+                </form>
+
+                <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                    <button type="button" id="demo-mode-btn" class="text-xs text-amber-400 hover:underline flex items-center gap-1 font-medium">
+                        <i class="fa-solid fa-bolt"></i> Demo Test Modu
+                    </button>
+                    <button type="button" id="troubleshoot-btn" class="text-xs text-indigo-400 hover:underline flex items-center gap-1 font-medium">
+                        <i class="fa-solid fa-circle-question"></i> Bağlantı Yardımcısı
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Saved Xtream Accounts Modal (Hesaplarım) -->
+        <div id="saved-accounts-modal" class="hidden fixed inset-0 z-50 glass-modal flex items-center justify-center p-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl p-6 relative my-8">
+                <button id="close-saved-accounts-btn" class="absolute top-4 right-4 text-slate-400 hover:text-white text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+
+                <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-lg">
+                            <i class="fa-solid fa-server"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-slate-100">Kayıtlı Xtream Hesaplarım</h3>
+                            <p class="text-xs text-slate-400">Giriş bilgileri arasında kolayca geçiş yapın</p>
+                        </div>
+                    </div>
+                    <button id="add-new-account-from-list-btn" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus text-xs"></i> Yeni Hesap
+                    </button>
+                </div>
+
+                <!-- Accounts List Container -->
+                <div id="saved-accounts-list" class="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                    <!-- Dynamic saved accounts rendered here -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- FIREBASE INITIALIZATION & SERVICE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCTlXFmw0SJk0-zZrYhCmClLPXX1kZivVU",
+            authDomain: "meka-iptv.firebaseapp.com",
+            projectId: "meka-iptv",
+            storageBucket: "meka-iptv.firebasestorage.app",
+            messagingSenderId: "423105300922",
+            appId: "1:423105300922:web:0b4df74ef89fed98703583",
+            measurementId: "G-G1SPK7W93W"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let currentUser = null;
+        let deferredPwaPrompt = null;
+
+        // Firebase Service Helper
+        class FirebaseAccountService {
+            static async initAuth() {
+                return new Promise((resolve) => {
+                    auth.onAuthStateChanged(async (user) => {
+                        currentUser = user;
+                        this.updateAuthUI(user);
+                        if (!user) {
+                            try {
+                                const cred = await auth.signInAnonymously();
+                                currentUser = cred.user;
+                                this.updateAuthUI(cred.user);
+                                resolve(cred.user);
+                            } catch (err) {
+                                console.warn("Firebase Auth Error:", err);
+                                resolve(null);
+                            }
+                        } else {
+                            resolve(user);
+                        }
+                    });
+                });
+            }
+
+            static updateAuthUI(user) {
+                const btnLabel = document.getElementById('auth-user-name');
+                const loggedInView = document.getElementById('auth-logged-in-view');
+                const formView = document.getElementById('auth-form-view');
+
+                if (user && !user.isAnonymous) {
+                    btnLabel.textContent = user.email ? user.email.split('@')[0] : 'Profilim';
+                    document.getElementById('logged-in-email').textContent = user.email;
+                    document.getElementById('logged-in-uid').textContent = user.uid;
+                    loggedInView.classList.remove('hidden');
+                    formView.classList.add('hidden');
+                } else {
+                    btnLabel.textContent = 'Giriş Yap';
+                    loggedInView.classList.add('hidden');
+                    formView.classList.remove('hidden');
+                }
+            }
+
+            static async registerUser(email, password) {
+                const cred = await auth.createUserWithEmailAndPassword(email, password);
+                currentUser = cred.user;
+                this.updateAuthUI(currentUser);
+                return currentUser;
+            }
+
+            static async loginUser(email, password) {
+                const cred = await auth.signInWithEmailAndPassword(email, password);
+                currentUser = cred.user;
+                this.updateAuthUI(currentUser);
+                return currentUser;
+            }
+
+            static async signOutUser() {
+                await auth.signOut();
+                currentUser = null;
+                await this.initAuth();
+            }
+
+            static async saveAccount(accountData) {
+                if (!currentUser) await this.initAuth();
+                if (!currentUser) {
+                    this.saveLocalAccount(accountData);
+                    return accountData.id || Date.now().toString();
+                }
+
+                const docId = accountData.id || db.collection('users').doc(currentUser.uid).collection('accounts').doc().id;
+                const record = {
+                    id: docId,
+                    label: accountData.label || accountData.username || 'Xtream IPTV',
+                    host: accountData.host,
+                    username: accountData.username,
+                    password: accountData.password,
+                    corsProxy: accountData.corsProxy || 'auto',
+                    isDefault: !!accountData.isDefault,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                if (accountData.isDefault) {
+                    await this.clearDefaults();
+                }
+
+                await db.collection('users').doc(currentUser.uid).collection('accounts').doc(docId).set(record, { merge: true });
+                this.saveLocalAccount(record);
+                return docId;
+            }
+
+            static async clearDefaults() {
+                if (!currentUser) return;
+                const snap = await db.collection('users').doc(currentUser.uid).collection('accounts').where('isDefault', '==', true).get();
+                const batch = db.batch();
+                snap.forEach(doc => {
+                    batch.update(doc.ref, { isDefault: false });
+                });
+                await batch.commit();
+            }
+
+            static async setDefaultAccount(accountId) {
+                if (!currentUser) await this.initAuth();
+                if (!currentUser) return;
+
+                await this.clearDefaults();
+                await db.collection('users').doc(currentUser.uid).collection('accounts').doc(accountId).update({
+                    isDefault: true
+                });
+            }
+
+            static async deleteAccount(accountId) {
+                if (!currentUser) await this.initAuth();
+                if (currentUser) {
+                    await db.collection('users').doc(currentUser.uid).collection('accounts').doc(accountId).delete();
+                }
+                const local = this.getLocalAccounts().filter(a => a.id !== accountId);
+                localStorage.setItem('iptv_saved_accounts', JSON.stringify(local));
+            }
+
+            static async getAccounts() {
+                if (!currentUser) await this.initAuth();
+                if (!currentUser) return this.getLocalAccounts();
+
+                try {
+                    const snap = await db.collection('users').doc(currentUser.uid).collection('accounts').get();
+                    const list = [];
+                    snap.forEach(doc => list.push(doc.data()));
+                    
+                    if (list.length > 0) {
+                        localStorage.setItem('iptv_saved_accounts', JSON.stringify(list));
+                        return list;
+                    }
+                    return this.getLocalAccounts();
+                } catch (e) {
+                    return this.getLocalAccounts();
+                }
+            }
+
+            static saveLocalAccount(acc) {
+                const list = this.getLocalAccounts().filter(a => a.id !== acc.id);
+                if (acc.isDefault) {
+                    list.forEach(a => a.isDefault = false);
+                }
+                list.unshift(acc);
+                localStorage.setItem('iptv_saved_accounts', JSON.stringify(list));
+            }
+
+            static getLocalAccounts() {
+                return JSON.parse(localStorage.getItem('iptv_saved_accounts') || '[]');
+            }
+        }
+
+        // --- GLOBAL APP STATE MANAGEMENT ---
+        const AppState = {
+            currentView: 'live', // 'live', 'vod', 'series', 'm3u'
+            credentials: null,
+            activeAccountObj: null,
+            corsProxy: 'auto',
+            isDemoMode: false,
+            categories: [],
+            activeCategory: 'all',
+            streams: [],
+            renderedStreamCount: 60,
+            activeStream: null,
+            favorites: JSON.parse(localStorage.getItem('iptv_favorites') || '[]'),
+            hlsInstance: null,
+            m3uStreams: [],
+            savedAccounts: [],
+            cache: {
+                categories: {},
+                streams: {},
+                seriesInfo: {}
+            }
+        };
+
+        const DemoMockData = {
+            liveCategories: [
+                { category_id: "1", category_name: "🎬 Genel Eğlence" },
+                { category_id: "2", category_name: "⚽ Canlı Spor 4K" }
+            ],
+            liveStreams: [
+                {
+                    stream_id: "demo_1",
+                    name: "StreamPulse Demo 4K Feed",
+                    stream_icon: "https://placehold.co/100x100/4f46e5/ffffff?text=4K+Live",
+                    category_id: "1",
+                    url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+                    epg: "Kesintisiz Yüksek Çözünürlüklü HLS Test Yayını"
+                },
+                {
+                    stream_id: "demo_2",
+                    name: "Sintel Open Feature Film HLS",
+                    stream_icon: "https://placehold.co/100x100/0284c7/ffffff?text=Sintel",
+                    category_id: "1",
+                    url: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8",
+                    epg: "Çoklu Ses Destekli Animasyon Test Yayını"
+                },
+                {
+                    stream_id: "demo_3",
+                    name: "Tears of Steel Sci-Fi Feed",
+                    stream_icon: "https://placehold.co/100x100/e11d48/ffffff?text=SciFi",
+                    category_id: "2",
+                    url: "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8",
+                    epg: "4K Bilim Kurgu Test Akışı"
+                }
+            ]
+        };
+
+        class XtreamService {
+            static normalizeHost(host) {
+                let clean = host.trim();
+                if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+                    clean = 'http://' + clean;
+                }
+                return clean.replace(/\/+$/, "");
+            }
+
+            static async fetchWithProxy(targetUrl) {
+                const proxyPipelines = [];
+
+                if (AppState.corsProxy === 'direct') {
+                    proxyPipelines.push(targetUrl);
+                } else if (AppState.corsProxy === 'codetabs') {
+                    proxyPipelines.push(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`);
+                } else if (AppState.corsProxy === 'corsproxy') {
+                    proxyPipelines.push(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+                } else if (AppState.corsProxy === 'allorigins') {
+                    proxyPipelines.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
+                } else if (AppState.corsProxy === 'thingproxy') {
+                    proxyPipelines.push(`https://thingproxy.freeboard.io/fetch/${targetUrl}`);
+                } else {
+                    // Otomatik Mod: Sırasıyla tüm güvenilir proxy servislerini dener
+                    proxyPipelines.push(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`);
+                    proxyPipelines.push(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+                    proxyPipelines.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
+                    proxyPipelines.push(`https://thingproxy.freeboard.io/fetch/${targetUrl}`);
+                    proxyPipelines.push(targetUrl);
+                }
+
+                for (const url of proxyPipelines) {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 9000);
+
+                        const response = await fetch(url, { signal: controller.signal });
+                        clearTimeout(timeoutId);
+
+                        if (response.ok) {
+                            const text = await response.text();
+                            if (text && (text.startsWith('{') || text.startsWith('['))) {
+                                return JSON.parse(text);
+                            }
+                        }
+                    } catch (err) {
+                        console.warn(`Proxy denemesi başarısız (${url}):`, err);
+                    }
+                }
+
+                throw new Error("IPTV Sunucusundan yanıt alınamadı. CORS Çözücü modunu değiştirmeyi veya M3U yüklemeyi deneyin.");
+            }
+
+            static async authenticate(host, username, password) {
+                const cleanHost = this.normalizeHost(host);
+                const targetUrl = `${cleanHost}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+                
+                const data = await this.fetchWithProxy(targetUrl);
+                if (data.user_info && data.user_info.auth === 0) {
+                    throw new Error("Giriş Başarısız: Kullanıcı adı veya Şifre Hatalı");
+                }
+                return data;
+            }
+
+            static async fetchCategories(type = 'live') {
+                if (AppState.isDemoMode) return DemoMockData.liveCategories;
+                if (AppState.currentView === 'm3u') return this.getM3UCategories();
+
+                if (AppState.cache.categories[type]) {
+                    return AppState.cache.categories[type];
+                }
+
+                const action = type === 'live' ? 'get_live_categories' : type === 'vod' ? 'get_vod_categories' : 'get_series_categories';
+                const { host, username, password } = AppState.credentials;
+                const cleanHost = this.normalizeHost(host);
+                const targetUrl = `${cleanHost}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=${action}`;
+
+                const result = await this.fetchWithProxy(targetUrl);
+                AppState.cache.categories[type] = result;
+                return result;
+            }
+
+            static async fetchStreams(type = 'live', categoryId = null) {
+                if (AppState.isDemoMode) return DemoMockData.liveStreams;
+                if (AppState.currentView === 'm3u') return this.filterM3UStreams(categoryId);
+
+                const cacheKey = `${type}_${categoryId || 'all'}`;
+                if (AppState.cache.streams[cacheKey]) {
+                    return AppState.cache.streams[cacheKey];
+                }
+
+                const action = type === 'live' ? 'get_live_streams' : type === 'vod' ? 'get_vod_streams' : 'get_series';
+                let catParam = categoryId && categoryId !== 'all' && categoryId !== 'fav' ? `&category_id=${categoryId}` : '';
+                
+                const { host, username, password } = AppState.credentials;
+                const cleanHost = this.normalizeHost(host);
+                const targetUrl = `${cleanHost}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=${action}${catParam}`;
+
+                let streams = await this.fetchWithProxy(targetUrl);
+                if (categoryId === 'fav') {
+                    streams = streams.filter(s => AppState.favorites.includes(String(s.stream_id)));
+                }
+                
+                AppState.cache.streams[cacheKey] = streams;
+                return streams;
+            }
+
+            static async fetchEPG(streamId) {
+                if (AppState.isDemoMode || AppState.currentView === 'm3u' || !AppState.credentials) return null;
+                const { host, username, password } = AppState.credentials;
+                const cleanHost = this.normalizeHost(host);
+                const targetUrl = `${cleanHost}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_short_epg&stream_id=${streamId}&limit=10`;
+                
+                try {
+                    return await this.fetchWithProxy(targetUrl);
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            static async fetchSeriesInfo(seriesId) {
+                if (AppState.cache.seriesInfo[seriesId]) return AppState.cache.seriesInfo[seriesId];
+                if (!AppState.credentials) return null;
+
+                const { host, username, password } = AppState.credentials;
+                const cleanHost = this.normalizeHost(host);
+                const targetUrl = `${cleanHost}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_series_info&series_id=${seriesId}`;
+                
+                const info = await this.fetchWithProxy(targetUrl);
+                AppState.cache.seriesInfo[seriesId] = info;
+                return info;
+            }
+
+            static getStreamUrl(streamId, containerExt = null) {
+                if (AppState.isDemoMode) {
+                    const demoItem = DemoMockData.liveStreams.find(s => s.stream_id === streamId);
+                    return demoItem ? demoItem.url : '';
+                }
+                if (AppState.currentView === 'm3u') {
+                    const m3uItem = AppState.m3uStreams.find(s => String(s.stream_id) === String(streamId));
+                    return m3uItem ? m3uItem.url : '';
+                }
+
+                const { host, username, password } = AppState.credentials;
+                const cleanHost = this.normalizeHost(host);
+                const prefix = AppState.currentView === 'vod' ? 'movie' : AppState.currentView === 'series' ? 'series' : 'live';
+                const extension = containerExt || (AppState.currentView === 'vod' ? 'mp4' : 'm3u8');
+                
+                const rawUrl = `${cleanHost}/${prefix}/${encodeURIComponent(username)}/${encodeURIComponent(password)}/${streamId}.${extension}`;
+                
+                if (AppState.corsProxy === 'corsproxy') {
+                    return `https://corsproxy.io/?${encodeURIComponent(rawUrl)}`;
+                } else if (AppState.corsProxy === 'codetabs') {
+                    return `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rawUrl)}`;
+                }
+                return rawUrl;
+            }
+
+            static getM3UCategories() {
+                const cats = new Set(AppState.m3uStreams.map(s => s.category_name || "Genel"));
+                return Array.from(cats).map((c, i) => ({ category_id: `m3u_cat_${i}`, category_name: c }));
+            }
+
+            static filterM3UStreams(categoryId) {
+                if (!categoryId || categoryId === 'all') return AppState.m3uStreams;
+                if (categoryId === 'fav') return AppState.m3uStreams.filter(s => AppState.favorites.includes(String(s.stream_id)));
+                
+                const catObj = this.getM3UCategories().find(c => c.category_id === categoryId);
+                if (!catObj) return AppState.m3uStreams;
+                return AppState.m3uStreams.filter(s => (s.category_name || "Genel") === catObj.category_name);
+            }
+        }
+
+        class VideoPlayerEngine {
+            constructor(videoElement) {
+                this.video = videoElement;
+                this.hls = null;
+                this.initListeners();
+            }
+
+            initListeners() {
+                this.video.addEventListener('play', () => {
+                    document.getElementById('play-pause-btn').innerHTML = '<i class="fa-solid fa-pause"></i>';
+                });
+                this.video.addEventListener('pause', () => {
+                    document.getElementById('play-pause-btn').innerHTML = '<i class="fa-solid fa-play"></i>';
+                });
+                this.video.addEventListener('timeupdate', () => {
+                    if (this.video.duration) {
+                        const progress = (this.video.currentTime / this.video.duration) * 100;
+                        document.getElementById('seek-bar').value = progress;
+                        document.getElementById('current-time').textContent = this.formatTime(this.video.currentTime);
+                        document.getElementById('duration-time').textContent = this.formatTime(this.video.duration);
+                    }
+                });
+                this.video.addEventListener('waiting', () => {
+                    document.getElementById('player-spinner').classList.remove('hidden');
+                });
+                this.video.addEventListener('playing', () => {
+                    document.getElementById('player-spinner').classList.add('hidden');
+                });
+
+                document.getElementById('quality-selector').addEventListener('change', (e) => {
+                    if (this.hls) this.hls.currentLevel = parseInt(e.target.value, 10);
+                });
+
+                document.getElementById('audio-track-selector').addEventListener('change', (e) => {
+                    if (this.hls) this.hls.audioTrack = parseInt(e.target.value, 10);
+                });
+
+                document.getElementById('subtitle-track-selector').addEventListener('change', (e) => {
+                    if (this.hls) this.hls.subtitleTrack = parseInt(e.target.value, 10);
+                });
+            }
+
+            loadStream(streamUrl) {
+                document.getElementById('player-placeholder').classList.add('hidden');
+                document.getElementById('player-spinner').classList.remove('hidden');
+
+                if (this.hls) this.hls.destroy();
+
+                if (Hls.isSupported()) {
+                    this.hls = new Hls({ 
+                        enableWorker: true, 
+                        lowLatencyMode: true,
+                        maxBufferLength: 30,
+                        maxMaxBufferLength: 60,
+                        backBufferLength: 30,
+                        capLevelToPlayerSize: true
+                    });
+                    this.hls.loadSource(streamUrl);
+                    this.hls.attachMedia(this.video);
+
+                    this.hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+                        this.video.play().catch(e => console.warn("Autoplay:", e));
+                        document.getElementById('player-spinner').classList.add('hidden');
+
+                        // Qualities
+                        const qualitySelect = document.getElementById('quality-selector');
+                        qualitySelect.innerHTML = '<option value="-1">Kalite: Otomatik</option>';
+                        if (data.levels && data.levels.length > 1) {
+                            data.levels.forEach((level, index) => {
+                                const res = level.height ? `${level.height}p` : `${Math.round(level.bitrate / 1000)}k`;
+                                const opt = document.createElement('option');
+                                opt.value = index;
+                                opt.textContent = `Kalite: ${res}`;
+                                qualitySelect.appendChild(opt);
+                            });
+                        }
+                    });
+
+                    // Multi Audio Tracks Listener
+                    this.hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (event, data) => {
+                        const audioSelect = document.getElementById('audio-track-selector');
+                        audioSelect.innerHTML = '<option value="-1">Ses: Varsayılan</option>';
+                        if (data.audioTracks && data.audioTracks.length > 1) {
+                            data.audioTracks.forEach((track, index) => {
+                                const opt = document.createElement('option');
+                                opt.value = index;
+                                opt.textContent = `Ses: ${track.name || track.lang || `Kanal ${index + 1}`}`;
+                                audioSelect.appendChild(opt);
+                            });
+                        }
+                    });
+
+                    // Subtitle Tracks Listener
+                    this.hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (event, data) => {
+                        const subSelect = document.getElementById('subtitle-track-selector');
+                        subSelect.innerHTML = '<option value="-1">Altyazı: Kapalı</option>';
+                        if (data.subtitleTracks && data.subtitleTracks.length > 0) {
+                            data.subtitleTracks.forEach((track, index) => {
+                                const opt = document.createElement('option');
+                                opt.value = index;
+                                opt.textContent = `Altyazı: ${track.name || track.lang || `Dil ${index + 1}`}`;
+                                subSelect.appendChild(opt);
+                            });
+                        }
+                    });
+
+                    this.hls.on(Hls.Events.ERROR, (event, data) => {
+                        if (data.fatal) {
+                            showToast("Yayın Hatası: Yeniden deneniyor", "error");
+                            document.getElementById('player-spinner').classList.add('hidden');
+                        }
+                    });
+
+                    AppState.hlsInstance = this.hls;
+                } else if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
+                    this.video.src = streamUrl;
+                    this.video.play();
+                } else {
+                    showToast("HLS Oynatma desteklenmiyor", "error");
+                }
+            }
+
+            formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+        }
+
+        let playerInstance = null;
+
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'error' ? 'bg-rose-600' : type === 'success' ? 'bg-emerald-600' : 'bg-indigo-600';
+            toast.className = `${bgClass} text-white px-4 py-2.5 rounded-xl text-xs font-medium shadow-lg transition-all transform translate-y-2 flex items-center gap-2 pointer-events-auto z-50`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-info"></i> <span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        function debounce(func, wait = 200) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        function parseM3UContent(content) {
+            const lines = content.split('\n');
+            const streams = [];
+            let currentItem = null;
+
+            lines.forEach((line, index) => {
+                line = line.trim();
+                if (line.startsWith('#EXTINF:')) {
+                    const nameMatch = line.match(/,(.+)$/);
+                    const groupMatch = line.match(/group-title="([^"]+)"/);
+                    const logoMatch = line.match(/tvg-logo="([^"]+)"/);
+
+                    currentItem = {
+                        stream_id: `m3u_${index}`,
+                        name: nameMatch ? nameMatch[1].trim() : 'Bilinmeyen Kanal',
+                        category_name: groupMatch ? groupMatch[1] : 'Genel',
+                        stream_icon: logoMatch ? logoMatch[1] : '',
+                        epg: 'M3U Playlist Yayını'
+                    };
+                } else if (line && !line.startsWith('#') && currentItem) {
+                    currentItem.url = line;
+                    streams.push(currentItem);
+                    currentItem = null;
+                }
+            });
+
+            return streams;
+        }
+
+        async function renderCategories() {
+            const container = document.getElementById('category-list');
+            container.innerHTML = `<div class="p-3 text-center text-xs text-slate-500"><i class="fa-solid fa-spinner animate-spin"></i> Yükleniyor...</div>`;
+
+            try {
+                const categories = await XtreamService.fetchCategories(AppState.currentView);
+                AppState.categories = categories;
+
+                document.getElementById('category-count').textContent = categories.length;
+                container.innerHTML = '';
+
+                // Favoriler kategorisi
+                const favBtn = document.createElement('button');
+                favBtn.className = `w-full text-left px-3 py-2 rounded-xl text-xs font-medium transition flex items-center justify-between ${AppState.activeCategory === 'fav' ? 'bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30' : 'text-amber-400/80 hover:bg-slate-800/80 hover:text-amber-300'}`;
+                favBtn.innerHTML = `<span><i class="fa-solid fa-star mr-2 text-amber-400"></i> Favorilerim</span>`;
+                favBtn.onclick = () => selectCategory('fav', 'Favori Kanallar');
+                container.appendChild(favBtn);
+
+                // Tüm İçerikler
+                const allBtn = document.createElement('button');
+                allBtn.className = `w-full text-left px-3 py-2 rounded-xl text-xs font-medium transition flex items-center justify-between ${AppState.activeCategory === 'all' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'}`;
+                allBtn.innerHTML = `<span><i class="fa-solid fa-border-all mr-2"></i> Tüm İçerik</span>`;
+                allBtn.onclick = () => selectCategory('all', 'Tüm İçerik');
+                container.appendChild(allBtn);
+
+                categories.forEach(cat => {
+                    const id = String(cat.category_id);
+                    const name = cat.category_name;
+                    const btn = document.createElement('button');
+                    btn.className = `w-full text-left px-3 py-2 rounded-xl text-xs font-medium transition flex items-center justify-between truncate ${AppState.activeCategory === id ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'}`;
+                    btn.innerHTML = `<span class="truncate"><i class="fa-regular fa-folder mr-2"></i> ${name}</span>`;
+                    btn.onclick = () => selectCategory(id, name);
+                    container.appendChild(btn);
+                });
+
+                loadStreams();
+            } catch (err) {
+                container.innerHTML = `<div class="p-3 text-center text-xs text-rose-400">Kategoriler Yüklenemedi.</div>`;
+            }
+        }
+
+        async function selectCategory(id, name = 'Tüm İçerik') {
+            AppState.activeCategory = id;
+            AppState.renderedStreamCount = 60;
+            document.getElementById('current-category-title').textContent = name;
+            renderCategories();
+        }
+
+        async function loadStreams() {
+            const container = document.getElementById('items-container');
+            container.innerHTML = `<div class="p-8 text-center text-xs text-slate-500"><i class="fa-solid fa-circle-notch animate-spin text-xl mb-2 text-indigo-500"></i><br>Yayınlar Yükleniyor...</div>`;
+
+            try {
+                const streams = await XtreamService.fetchStreams(AppState.currentView, AppState.activeCategory);
+                AppState.streams = streams;
+                AppState.renderedStreamCount = 60;
+                document.getElementById('stream-count').textContent = `${streams.length} öğe`;
+
+                if (streams.length === 0) {
+                    container.innerHTML = `<div class="p-8 text-center text-xs text-slate-500">Bu kategoride yayın bulunamadı</div>`;
+                    return;
+                }
+
+                container.innerHTML = '';
+                renderStreamBatch();
+            } catch (err) {
+                container.innerHTML = `<div class="p-8 text-center text-xs text-rose-400">Yayınlar yüklenemedi.</div>`;
+            }
+        }
+
+        function renderStreamBatch() {
+            const container = document.getElementById('items-container');
+            const total = AppState.streams.length;
+            const currentCount = container.children.length;
+            const targetCount = Math.min(total, currentCount + 60);
+
+            for (let i = currentCount; i < targetCount; i++) {
+                const stream = AppState.streams[i];
+                if (!stream) break;
+
+                const id = String(stream.stream_id || stream.series_id);
+                const name = stream.name;
+                const logo = stream.stream_icon || stream.cover || 'https://placehold.co/80x80/1e293b/6366f1?text=TV';
+                const isFav = AppState.favorites.includes(id);
+                const rating = stream.rating_5based ? (stream.rating_5based * 2).toFixed(1) : (stream.rating || null);
+
+                const card = document.createElement('div');
+                card.className = `p-2.5 rounded-xl hover:bg-slate-900 border border-transparent hover:border-slate-800 transition cursor-pointer flex items-center gap-3 group content-visibility-auto`;
+                
+                card.innerHTML = `
+                    <img src="${logo}" loading="lazy" onerror="this.src='https://placehold.co/80x80/1e293b/6366f1?text=TV'" class="w-10 h-10 rounded-lg bg-slate-900 object-contain p-1 border border-slate-800 shrink-0">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5">
+                            <h4 class="text-xs font-semibold text-slate-200 truncate group-hover:text-indigo-400 transition">${name}</h4>
+                            ${rating ? `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 shrink-0">★ ${rating}</span>` : ''}
+                        </div>
+                        <p class="text-[10px] text-slate-500 truncate">${stream.plot || stream.genre || stream.epg || 'Yayın'}</p>
+                    </div>
+                    <button class="fav-btn text-xs ${isFav ? 'text-amber-400' : 'text-slate-600 hover:text-amber-400'} p-1">
+                        <i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i>
+                    </button>
+                `;
+
+                card.onclick = (e) => {
+                    if (e.target.closest('.fav-btn')) {
+                        e.stopPropagation();
+                        toggleFavorite(id);
+                        return;
+                    }
+                    if (AppState.currentView === 'series') {
+                        openSeriesModal(stream);
+                    } else {
+                        playStream(stream);
+                    }
+                };
+
+                container.appendChild(card);
+            }
+        }
+
+        async function playStream(stream) {
+            AppState.activeStream = stream;
+            const streamId = stream.stream_id || stream.series_id;
+            const url = XtreamService.getStreamUrl(streamId, stream.container_extension);
+
+            document.getElementById('player-channel-title').textContent = stream.name;
+            document.getElementById('player-program-now').textContent = stream.epg || 'Canlı Yayın';
+            document.getElementById('epg-channel-name').textContent = stream.name;
+            document.getElementById('epg-description').textContent = stream.plot || 'Seçilen kanal yayını oynatılıyor...';
+            
+            if (stream.stream_icon || stream.cover) {
+                document.getElementById('epg-channel-logo').src = stream.stream_icon || stream.cover;
+            }
+
+            playerInstance.loadStream(url);
+
+            // Fetch & Render EPG if Live TV
+            if (AppState.currentView === 'live') {
+                loadDetailedEPG(streamId);
+            } else {
+                document.getElementById('epg-progress-wrapper').classList.add('hidden');
+                document.getElementById('epg-upcoming-list').classList.add('hidden');
+            }
+        }
+
+        // Detailed EPG Fetcher & Dynamic Schedule Renderer
+        async function loadDetailedEPG(streamId) {
+            const epgWrapper = document.getElementById('epg-progress-wrapper');
+            const upcomingList = document.getElementById('epg-upcoming-list');
+            
+            epgWrapper.classList.add('hidden');
+            upcomingList.classList.add('hidden');
+
+            const epgData = await XtreamService.fetchEPG(streamId);
+            if (!epgData || !epgData.epg_listings || epgData.epg_listings.length === 0) {
+                return;
+            }
+
+            const now = Math.floor(Date.now() / 1000);
+            const listings = epgData.epg_listings;
+            let currentProg = null;
+            const upcoming = [];
+
+            listings.forEach(prog => {
+                const start = parseInt(prog.start_timestamp, 10);
+                const end = parseInt(prog.stop_timestamp, 10);
+
+                if (now >= start && now <= end) {
+                    currentProg = prog;
+                } else if (start > now) {
+                    upcoming.push(prog);
+                }
+            });
+
+            if (currentProg) {
+                const start = parseInt(currentProg.start_timestamp, 10);
+                const end = parseInt(currentProg.stop_timestamp, 10);
+                const percent = Math.min(100, Math.max(0, Math.round(((now - start) / (end - start)) * 100)));
+
+                const titleStr = atob(currentProg.title || '') || 'Canlı Yayın';
+                const descStr = atob(currentProg.description || '') || 'Program detayı bulunmuyor.';
+
+                document.getElementById('epg-current-title').textContent = titleStr;
+                document.getElementById('epg-description').textContent = descStr;
+
+                const formatHour = (timestamp) => {
+                    const date = new Date(timestamp * 1000);
+                    return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+                };
+
+                document.getElementById('epg-start-time').textContent = formatHour(start);
+                document.getElementById('epg-end-time').textContent = formatHour(end);
+                document.getElementById('epg-time-range').textContent = `(${formatHour(start)} - ${formatHour(end)})`;
+                document.getElementById('epg-progress-percent').textContent = `${percent}%`;
+                document.getElementById('epg-progress-bar').style.width = `${percent}%`;
+                
+                epgWrapper.classList.remove('hidden');
+            }
+
+            if (upcoming.length > 0) {
+                upcomingList.innerHTML = `<h5 class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Günün Sıradaki Yayınları</h5>`;
+                upcoming.slice(0, 4).forEach(prog => {
+                    const title = atob(prog.title || '') || 'Program';
+                    const startTime = new Date(parseInt(prog.start_timestamp, 10) * 1000).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+
+                    const row = document.createElement('div');
+                    row.className = "flex items-center justify-between text-xs py-1";
+                    row.innerHTML = `
+                        <span class="text-slate-300 truncate max-w-[280px]">${title}</span>
+                        <span class="text-indigo-400 font-mono text-[10px] font-bold shrink-0">${startTime}</span>
+                    `;
+                    upcomingList.appendChild(row);
+                });
+                upcomingList.classList.remove('hidden');
+            }
+        }
+
+        // Open Series Seasons & Episodes Modal
+        async function openSeriesModal(series) {
+            const modal = document.getElementById('series-modal');
+            const poster = document.getElementById('series-poster');
+            const title = document.getElementById('series-title');
+            const rating = document.getElementById('series-rating');
+            const genre = document.getElementById('series-genre');
+            const plot = document.getElementById('series-plot');
+            const cast = document.getElementById('series-cast');
+            const seasonTabs = document.getElementById('season-tabs-container');
+            const episodesContainer = document.getElementById('episodes-container');
+
+            poster.src = series.cover || 'https://placehold.co/200x300/1e293b/6366f1?text=Series';
+            title.textContent = series.name;
+            rating.textContent = `★ ${series.rating || '0.0'}`;
+            genre.textContent = `Tür: ${series.genre || 'Dizi'}`;
+            plot.textContent = series.plot || 'Dizi özeti bulunmuyor.';
+            cast.textContent = `Oyuncular: ${series.cast || '-'}`;
+
+            seasonTabs.innerHTML = `<div class="text-xs text-slate-500"><i class="fa-solid fa-spinner animate-spin"></i> Sezonlar Yükleniyor...</div>`;
+            episodesContainer.innerHTML = '';
+            modal.classList.remove('hidden');
+
+            const info = await XtreamService.fetchSeriesInfo(series.series_id);
+            if (!info || !info.episodes) {
+                seasonTabs.innerHTML = `<div class="text-xs text-rose-400">Bölüm bilgileri çekilemedi</div>`;
+                return;
+            }
+
+            const seasons = Object.keys(info.episodes);
+            seasonTabs.innerHTML = '';
+
+            seasons.forEach((seasonNum, index) => {
+                const btn = document.createElement('button');
+                btn.className = `px-4 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${index === 0 ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`;
+                btn.textContent = `${seasonNum}. Sezon`;
+                
+                btn.onclick = () => {
+                    Array.from(seasonTabs.children).forEach(c => c.className = "px-4 py-1.5 rounded-xl text-xs font-bold transition shrink-0 bg-slate-800 text-slate-400 hover:text-white");
+                    btn.className = "px-4 py-1.5 rounded-xl text-xs font-bold transition shrink-0 bg-indigo-600 text-white";
+                    renderEpisodes(info.episodes[seasonNum], series);
+                };
+
+                seasonTabs.appendChild(btn);
+            });
+
+            if (seasons.length > 0) {
+                renderEpisodes(info.episodes[seasons[0]], series);
+            }
+        }
+
+        function renderEpisodes(episodesList, seriesObj) {
+            const container = document.getElementById('episodes-container');
+            container.innerHTML = '';
+
+            episodesList.forEach(ep => {
+                const card = document.createElement('div');
+                card.className = "p-3 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-indigo-500 transition flex items-center justify-between gap-3 cursor-pointer group";
+                
+                card.innerHTML = `
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold text-xs shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition">
+                            S${ep.season}E${ep.episode_num}
+                        </div>
+                        <div class="min-w-0">
+                            <h4 class="text-xs font-bold text-slate-200 truncate group-hover:text-indigo-400 transition">${ep.title || `Bölüm ${ep.episode_num}`}</h4>
+                            <p class="text-[10px] text-slate-500 truncate">${ep.info && ep.info.duration ? ep.info.duration : 'Bölüm Oynat'}</p>
+                        </div>
+                    </div>
+
+                    <button class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0">
+                        <i class="fa-solid fa-play text-[10px]"></i> Oynat
+                    </button>
+                `;
+
+                card.onclick = () => {
+                    document.getElementById('series-modal').classList.add('hidden');
+                    playStream({
+                        stream_id: ep.id,
+                        name: `${seriesObj.name} - S${ep.season}E${ep.episode_num} ${ep.title}`,
+                        container_extension: ep.container_extension || 'mp4',
+                        plot: ep.info ? ep.info.plot : seriesObj.plot
+                    });
+                };
+
+                container.appendChild(card);
+            });
+        }
+
+        function toggleFavorite(id) {
+            const index = AppState.favorites.indexOf(id);
+            if (index >= 0) {
+                AppState.favorites.splice(index, 1);
+                showToast("Favorilerden Çıkarıldı", "info");
+            } else {
+                AppState.favorites.push(id);
+                showToast("Favorilere Eklendi!", "success");
+            }
+            localStorage.setItem('iptv_favorites', JSON.stringify(AppState.favorites));
+            if (AppState.activeCategory === 'fav') {
+                loadStreams();
+            } else {
+                renderStreamBatch();
+            }
+        }
+
+        async function renderSavedAccountsList() {
+            const container = document.getElementById('saved-accounts-list');
+            container.innerHTML = `<div class="p-4 text-center text-xs text-slate-500"><i class="fa-solid fa-spinner animate-spin"></i> Hesaplar yükleniyor...</div>`;
+
+            const accounts = await FirebaseAccountService.getAccounts();
+            AppState.savedAccounts = accounts;
+
+            document.getElementById('saved-accounts-count-badge').textContent = accounts.length;
+
+            if (accounts.length === 0) {
+                container.innerHTML = `
+                    <div class="p-6 text-center text-xs text-slate-400 bg-slate-950 rounded-xl border border-slate-800">
+                        <i class="fa-solid fa-folder-open text-2xl text-slate-600 mb-2"></i>
+                        <p>Henüz kayıtlı Xtream hesabınız bulunmuyor.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '';
+            accounts.forEach(acc => {
+                const isActive = AppState.credentials && AppState.credentials.host === acc.host && AppState.credentials.username === acc.username;
+                const isDef = acc.isDefault;
+
+                const item = document.createElement('div');
+                item.className = `p-3 rounded-xl bg-slate-950 border ${isActive ? 'border-indigo-500 shadow-md shadow-indigo-500/10' : 'border-slate-800/80'} flex items-center justify-between gap-3`;
+                
+                item.innerHTML = `
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <h4 class="text-xs font-bold text-slate-100 truncate">${acc.label || acc.username}</h4>
+                            ${isDef ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30"><i class="fa-solid fa-star mr-1"></i>Varsayılan</span>' : ''}
+                            ${isActive ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Aktif</span>' : ''}
+                        </div>
+                        <p class="text-[10px] text-slate-400 truncate mt-0.5 font-mono">${acc.host} | User: ${acc.username}</p>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button class="set-def-btn p-1.5 rounded-lg ${isDef ? 'text-amber-400' : 'text-slate-500 hover:text-amber-400'} hover:bg-slate-900 transition">
+                            <i class="${isDef ? 'fa-solid' : 'fa-regular'} fa-star"></i>
+                        </button>
+                        <button class="connect-acc-btn px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition shadow">
+                            Bağlan
+                        </button>
+                        <button class="delete-acc-btn p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-900 transition">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                `;
+
+                item.querySelector('.set-def-btn').onclick = async () => {
+                    await FirebaseAccountService.setDefaultAccount(acc.id);
+                    showToast(`"${acc.label || acc.username}" varsayılan olarak ayarlandı!`, "success");
+                    renderSavedAccountsList();
+                };
+
+                item.querySelector('.connect-acc-btn').onclick = async () => {
+                    document.getElementById('saved-accounts-modal').classList.add('hidden');
+                    await connectToXtreamAccount(acc);
+                };
+
+                item.querySelector('.delete-acc-btn').onclick = async () => {
+                    if (confirm(`"${acc.label || acc.username}" hesabını silmek istediğinize emin misiniz?`)) {
+                        await FirebaseAccountService.deleteAccount(acc.id);
+                        showToast("Hesap silindi", "info");
+                        renderSavedAccountsList();
+                    }
+                };
+
+                container.appendChild(item);
+            });
+        }
+
+        async function connectToXtreamAccount(acc) {
+            AppState.corsProxy = acc.corsProxy || 'auto';
+            showToast(`"${acc.label || acc.username}" sunucusuna bağlanılıyor...`, "info");
+
+            try {
+                await XtreamService.authenticate(acc.host, acc.username, acc.password);
+                
+                AppState.credentials = { host: acc.host, username: acc.username, password: acc.password };
+                AppState.activeAccountObj = acc;
+                AppState.isDemoMode = false;
+                AppState.cache = { categories: {}, streams: {}, seriesInfo: {} };
+
+                document.getElementById('connect-btn-label').textContent = acc.label || acc.username;
+
+                showToast(`"${acc.label || acc.username}" hesabına başarıyla bağlandı!`, "success");
+                renderCategories();
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        function setupEventListeners() {
+            // PWA Install Prompt Listener
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPwaPrompt = e;
+                const pwaBtn = document.getElementById('pwa-install-btn');
+                pwaBtn.classList.remove('hidden');
+                pwaBtn.onclick = () => {
+                    deferredPwaPrompt.prompt();
+                    deferredPwaPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            showToast("StreamPulse başarıyla yüklendi!", "success");
+                        }
+                        pwaBtn.classList.add('hidden');
+                    });
+                };
+            });
+
+            // View Tabs (Live, VOD, Series, M3U)
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.addEventListener('click', (e) => {
+                    document.querySelectorAll('.nav-tab').forEach(t => {
+                        t.className = "nav-tab flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800";
+                    });
+                    const btn = e.currentTarget;
+                    btn.className = "nav-tab active flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-white bg-indigo-600";
+                    
+                    AppState.currentView = btn.dataset.view;
+                    AppState.activeCategory = 'all';
+                    document.getElementById('current-category-title').textContent = 'Tüm İçerik';
+                    renderCategories();
+                });
+            });
+
+            // Infinite scroll container listener
+            document.getElementById('items-container').addEventListener('scroll', debounce((e) => {
+                const el = e.target;
+                if (el.scrollTop + el.clientHeight >= el.scrollHeight - 300) {
+                    renderStreamBatch();
+                }
+            }, 100));
+
+            // Tab Switcher between Xtream API & M3U Upload
+            document.getElementById('tab-btn-xtream').addEventListener('click', () => {
+                document.getElementById('tab-btn-xtream').className = "flex-1 py-1.5 rounded-lg text-white bg-indigo-600 transition";
+                document.getElementById('tab-btn-m3u').className = "flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition";
+                document.getElementById('xtream-form').classList.remove('hidden');
+                document.getElementById('m3u-form').classList.add('hidden');
+            });
+
+            document.getElementById('tab-btn-m3u').addEventListener('click', () => {
+                document.getElementById('tab-btn-m3u').className = "flex-1 py-1.5 rounded-lg text-white bg-indigo-600 transition";
+                document.getElementById('tab-btn-xtream').className = "flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition";
+                document.getElementById('m3u-form').classList.remove('hidden');
+                document.getElementById('xtream-form').classList.add('hidden');
+            });
+
+            // Firebase Auth Modal Handlers
+            document.getElementById('auth-profile-btn').onclick = () => document.getElementById('auth-modal').classList.remove('hidden');
+            document.getElementById('close-auth-btn').onclick = () => document.getElementById('auth-modal').classList.add('hidden');
+
+            let authMode = 'login';
+            document.getElementById('tab-auth-login').onclick = () => {
+                authMode = 'login';
+                document.getElementById('tab-auth-login').className = "flex-1 py-1.5 rounded-lg text-white bg-indigo-600 transition";
+                document.getElementById('tab-auth-register').className = "flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition";
+                document.getElementById('auth-submit-btn').textContent = "Giriş Yap";
+            };
+
+            document.getElementById('tab-auth-register').onclick = () => {
+                authMode = 'register';
+                document.getElementById('tab-auth-register').className = "flex-1 py-1.5 rounded-lg text-white bg-indigo-600 transition";
+                document.getElementById('tab-auth-login').className = "flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition";
+                document.getElementById('auth-submit-btn').textContent = "Kayıt Ol";
+            };
+
+            document.getElementById('auth-form').onsubmit = async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('auth-email').value.trim();
+                const pass = document.getElementById('auth-password').value.trim();
+
+                try {
+                    if (authMode === 'register') {
+                        await FirebaseAccountService.registerUser(email, pass);
+                        showToast("Kullanıcı kaydı başarıyla oluşturuldu!", "success");
+                    } else {
+                        await FirebaseAccountService.loginUser(email, pass);
+                        showToast("Giriş yapıldı!", "success");
+                    }
+                    document.getElementById('auth-modal').classList.add('hidden');
+                    renderSavedAccountsList();
+                } catch (err) {
+                    showToast(err.message, "error");
+                }
+            };
+
+            document.getElementById('signout-btn').onclick = async () => {
+                await FirebaseAccountService.signOutUser();
+                showToast("Çıkış yapıldı", "info");
+                document.getElementById('auth-modal').classList.add('hidden');
+            };
+
+            // Xtream Form Submit & Save to Firebase
+            document.getElementById('xtream-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const label = document.getElementById('xtream-label').value.trim();
+                const host = document.getElementById('xtream-host').value.trim();
+                const user = document.getElementById('xtream-user').value.trim();
+                const pass = document.getElementById('xtream-pass').value.trim();
+                const corsProxy = document.getElementById('cors-proxy-select').value;
+                const shouldSave = document.getElementById('xtream-save-account').checked;
+                const isDefault = document.getElementById('xtream-is-default').checked;
+
+                const submitBtn = document.getElementById('connect-submit-btn');
+                submitBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Doğrulanıyor...`;
+
+                try {
+                    showToast("IPTV Sunucusuna bağlanılıyor...", "info");
+                    await XtreamService.authenticate(host, user, pass);
+
+                    const accData = {
+                        label: label || user,
+                        host,
+                        username: user,
+                        password: pass,
+                        corsProxy,
+                        isDefault
+                    };
+
+                    if (shouldSave) {
+                        accData.id = await FirebaseAccountService.saveAccount(accData);
+                    }
+
+                    AppState.credentials = { host, username: user, password: pass };
+                    AppState.corsProxy = corsProxy;
+                    AppState.isDemoMode = false;
+                    AppState.cache = { categories: {}, streams: {}, seriesInfo: {} };
+
+                    document.getElementById('login-modal').classList.add('hidden');
+                    document.getElementById('connect-btn-label').textContent = label || user;
+                    
+                    showToast("Bağlantı Başarılı!", "success");
+                    renderCategories();
+                } catch (err) {
+                    showToast(err.message, "error");
+                } finally {
+                    submitBtn.innerHTML = `<span>Sunucuya Bağlan ve Kaydet</span>`;
+                }
+            });
+
+            // M3U Form Submit
+            document.getElementById('m3u-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const fileInput = document.getElementById('m3u-file-input');
+                const textInput = document.getElementById('m3u-text-input').value.trim();
+
+                let m3uText = '';
+                if (fileInput.files.length > 0) {
+                    m3uText = await fileInput.files[0].text();
+                } else if (textInput.startsWith('http')) {
+                    try {
+                        showToast("M3U Linki indiriliyor...", "info");
+                        const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(textInput)}`);
+                        m3uText = await res.text();
+                    } catch (e) {
+                        showToast("M3U URL indirilemedi", "error");
+                        return;
+                    }
+                } else {
+                    m3uText = textInput;
+                }
+
+                if (!m3uText) {
+                    showToast("Lütfen dosya yükleyin veya M3U içeriği yapıştırın", "error");
+                    return;
+                }
+
+                const parsed = parseM3UContent(m3uText);
+                if (parsed.length === 0) {
+                    showToast("M3U dosyasında geçerli kanal bulunamadı", "error");
+                    return;
+                }
+
+                AppState.m3uStreams = parsed;
+                AppState.currentView = 'm3u';
+                AppState.isDemoMode = false;
+                AppState.cache = { categories: {}, streams: {}, seriesInfo: {} };
+
+                document.getElementById('login-modal').classList.add('hidden');
+                document.getElementById('connect-btn-label').textContent = "M3U Playlist";
+
+                showToast(`M3U listesinden ${parsed.length} kanal yüklendi!`, "success");
+                renderCategories();
+            });
+
+            // Demo Mode Launcher
+            const launchDemoMode = () => {
+                AppState.isDemoMode = true;
+                AppState.credentials = { host: 'demo', username: 'DemoUser', password: 'xxx' };
+                AppState.cache = { categories: {}, streams: {}, seriesInfo: {} };
+                document.getElementById('login-modal').classList.add('hidden');
+                document.getElementById('connect-btn-label').textContent = "Demo Modu";
+                showToast("Test HLS yayınları ile Demo Modu başlatıldı", "success");
+                renderCategories();
+            };
+
+            document.getElementById('demo-mode-btn').addEventListener('click', launchDemoMode);
+            document.getElementById('placeholder-demo-btn').addEventListener('click', launchDemoMode);
+
+            // Modals
+            document.getElementById('open-login-btn').onclick = () => document.getElementById('login-modal').classList.remove('hidden');
+            document.getElementById('placeholder-connect-btn').onclick = () => document.getElementById('login-modal').classList.remove('hidden');
+            document.getElementById('placeholder-saved-btn').onclick = () => {
+                document.getElementById('saved-accounts-modal').classList.remove('hidden');
+                renderSavedAccountsList();
+            };
+            document.getElementById('open-saved-accounts-btn').onclick = () => {
+                document.getElementById('saved-accounts-modal').classList.remove('hidden');
+                renderSavedAccountsList();
+            };
+            document.getElementById('close-saved-accounts-btn').onclick = () => document.getElementById('saved-accounts-modal').classList.add('hidden');
+            document.getElementById('close-series-btn').onclick = () => document.getElementById('series-modal').classList.add('hidden');
+            document.getElementById('close-login-btn').onclick = () => document.getElementById('login-modal').classList.add('hidden');
+
+            // Player controls
+            document.getElementById('play-pause-btn').onclick = () => {
+                if (playerInstance.video.paused) playerInstance.video.play();
+                else playerInstance.video.pause();
+            };
+
+            document.getElementById('volume-bar').oninput = (e) => {
+                playerInstance.video.volume = e.target.value;
+            };
+
+            document.getElementById('fullscreen-btn').onclick = () => {
+                const sec = document.getElementById('player-section');
+                if (!document.fullscreenElement) sec.requestFullscreen().catch(() => {});
+                else document.exitFullscreen();
+            };
+
+            // Debounced Search Inputs
+            document.getElementById('global-search').oninput = debounce((e) => {
+                const query = e.target.value.toLowerCase().trim();
+                if (!query) {
+                    loadStreams();
+                    return;
+                }
+                const filtered = AppState.streams.filter(s => s.name.toLowerCase().includes(query));
+                const container = document.getElementById('items-container');
+                container.innerHTML = '';
+                filtered.slice(0, 100).forEach(stream => {
+                    const card = document.createElement('div');
+                    card.className = `p-2.5 rounded-xl hover:bg-slate-900 border border-transparent transition cursor-pointer flex items-center gap-3`;
+                    card.innerHTML = `
+                        <img src="${stream.stream_icon || stream.cover || 'https://placehold.co/80x80/1e293b/6366f1?text=TV'}" class="w-8 h-8 rounded object-contain p-0.5 border border-slate-800">
+                        <h4 class="text-xs font-semibold text-slate-200 truncate">${stream.name}</h4>
+                    `;
+                    card.onclick = () => {
+                        if (AppState.currentView === 'series') openSeriesModal(stream);
+                        else playStream(stream);
+                    };
+                    container.appendChild(card);
+                });
+            }, 200);
+
+            document.getElementById('category-search').oninput = debounce((e) => {
+                const query = e.target.value.toLowerCase().trim();
+                const items = document.querySelectorAll('#category-list button');
+                items.forEach(btn => {
+                    const text = btn.textContent.toLowerCase();
+                    if (!query || text.includes(query)) {
+                        btn.style.display = 'flex';
+                    } else {
+                        btn.style.display = 'none';
+                    }
+                });
+            }, 200);
+        }
+
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').then((reg) => {
+                    console.log('PWA ServiceWorker registered:', reg);
+                }).catch((err) => {
+                    console.warn('PWA ServiceWorker registration failed:', err);
+                });
+            });
+        }
+
+        // Initial Auto-Load Logic on Application Launch
+        window.onload = async function() {
+            const videoElem = document.getElementById('main-player');
+            playerInstance = new VideoPlayerEngine(videoElem);
+            setupEventListeners();
+
+            try {
+                await FirebaseAccountService.initAuth();
+                const accounts = await FirebaseAccountService.getAccounts();
+                AppState.savedAccounts = accounts;
+                document.getElementById('saved-accounts-count-badge').textContent = accounts.length;
+
+                const defaultAcc = accounts.find(a => a.isDefault) || (accounts.length > 0 ? accounts[0] : null);
+
+                if (defaultAcc) {
+                    showToast(`Varsayılan hesaba otomatik bağlanılıyor: ${defaultAcc.label || defaultAcc.username}`, "info");
+                    await connectToXtreamAccount(defaultAcc);
+                } else {
+                    AppState.isDemoMode = true;
+                    renderCategories();
+                }
+            } catch (err) {
+                AppState.isDemoMode = true;
+                renderCategories();
+            }
+        };
+    </script>
+</body>
+</html>

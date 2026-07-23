@@ -1,0 +1,21 @@
+{
+  "name": "streampulse-iptv",
+  "version": "1.0.0",
+  "description": "StreamPulse - Real Xtream Codes & HLS IPTV Web Engine with Firebase integration",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx -y serve .",
+    "start": "npx -y serve .",
+    "build": "echo 'Static build ready for Vercel'"
+  },
+  "keywords": [
+    "iptv",
+    "xtream",
+    "hls",
+    "m3u",
+    "firebase",
+    "vercel"
+  ],
+  "author": "",
+  "license": "MIT"
+}
